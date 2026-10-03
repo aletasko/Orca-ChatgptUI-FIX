@@ -1,0 +1,19 @@
+{
+  "manifestVersion": 1,
+  "id": "chatui-send-fix",
+  "publisher": "aletasko",
+  "name": "ChatUI Send FIX",
+  "version": "1.0.0",
+  "description": "Pannello alternativo per inviare un messaggio e Invio al terminale dell'agente con conferma di accettazione.",
+  "engines": { "orca": ">=1.4.0" },
+  "pluginApi": 1,
+  "contributes": {
+    "panels": [
+      { "id": "send", "title": "ChatUI Send FIX", "icon": "send", "entry": "panel.html" }
+    ]
+  },
+  "capabilities": [
+    { "kind": "workspace:read" },
+    { "kind": "terminal:send" }
+  ]
+}

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root { color-scheme: dark light; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 16px;
+        color: var(--foreground, #ddd);
+        background: var(--background, transparent);
+        font: 13px/1.5 system-ui, sans-serif;
+      }
+      h1 { margin: 0 0 8px; font-size: 15px; }
+      p { margin: 0 0 12px; color: var(--muted-foreground, #999); }
+      label { display: block; margin: 12px 0 5px; font-weight: 600; }
+      select, textarea, button {
+        width: 100%;
+        font: inherit;
+        color: var(--foreground, #ddd);
+        background: var(--secondary, #2a2a2a);
+        border: 1px solid var(--border, #555);
+        border-radius: 6px;
+      }
+      select, button { padding: 7px 9px; }
+      textarea { display: block; min-height: 96px; padding: 8px; resize: vertical; }
+      button { cursor: pointer; }
+      button:disabled { cursor: default; opacity: .55; }
+      button.primary { background: var(--primary, #555); color: var(--primary-foreground, #fff); }
+      .row { display: flex; gap: 8px; }
+      .row > * { flex: 1; min-width: 0; }
+      .context { overflow-wrap: anywhere; }
+      .status { min-height: 3em; margin-top: 12px; white-space: pre-wrap; }
+      .error { color: var(--destructive, #f88); }
+    </style>
+  </head>
+  <body>
+    <h1>ChatUI Send FIX</h1>
+    <p>Invia al terminale dell'agente. Il testo resta qui se Orca rifiuta l'invio.</p>
+    <div id="context" class="context">Caricamento worktree…</div>
+    <label for="terminal">Terminale</label>
+    <div class="row">
+      <select id="terminal" disabled><option>Nessun terminale</option></select>
+      <button id="refresh" type="button">Aggiorna</button>
+    </div>
+    <label for="draft">Messaggio</label>
+    <textarea id="draft" maxlength="4095" placeholder="Scrivi qui. Invio per spedire, Maiusc+Invio per andare a capo."></textarea>
+    <button id="send" class="primary" type="button" disabled>Invia</button>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <script>
+      'use strict'
+      const context = document.getElementById('context')
+      const terminal = document.getElementById('terminal')
+      const refresh = document.getElementById('refresh')
+      const draft = document.getElementById('draft')
+      const send = document.getElementById('send')
+      const status = document.getElementById('status')
+      const pending = new Map()
+      let sequence = 0
+      let busy = false
+
+      function showStatus(message, error = false) {
+        status.textContent = message
+        status.classList.toggle('error', error)
+      }
+
+      function updateSendState() {
+        send.disabled = busy || !terminal.value || !draft.value.trim()
+      }
+
+      function call(action, params) {
+        return new Promise((resolve) => {
+          const requestId = 'request-' + ++sequence
+          const timeout = setTimeout(() => {
+            pending.delete(requestId)
+            resolve({ ok: false, error: 'Nessuna conferma da Orca. Verifica la chat prima di riprovare.' })
+          }, 20000)
+          pending.set(requestId, (result) => {
+            clearTimeout(timeout)
+            resolve(result)
+          })
+          window.parent.postMessage(
+            { type: 'orca-panel-action', requestId, action, params },
+            '*'
+          )
+        })
+      }
+
+      window.addEventListener('message', (event) => {
+        const data = event.data
+        if (!data || data.type !== 'orca-panel-action-result') return
+        const resolve = pending.get(data.requestId)
+        if (!resolve) return
+        pending.delete(data.requestId)
+        resolve(data)
+      })
+
+      async function loadTerminals() {
+        refresh.disabled = true
+        const previous = terminal.value
+        const result = await call('workspace.readContext', {})
+        refresh.disabled = false
+        terminal.replaceChildren()
+        if (!result.ok) {
+          context.textContent = 'Worktree non disponibile'
+          showStatus(result.error || result.errorCode || 'Impossibile leggere il worktree', true)
+        } else if (!result.value) {
+          context.textContent = 'Nessun worktree selezionato'
+          showStatus('Seleziona un worktree in Orca.', true)
+        } else {
+          context.textContent = result.value.displayName + ' · ' + result.value.branch
+          for (const item of result.value.terminals) {
+            const option = document.createElement('option')
+            option.value = item.id
+            option.textContent = item.id
+            terminal.append(option)
+          }
+          if (result.value.terminals.length === 0) {
+            showStatus('Nessun terminale aperto in questo worktree.', true)
+          } else {
+            terminal.value = result.value.terminals.some((item) => item.id === previous)
+              ? previous
+              : result.value.terminals[0].id
+            showStatus('Pronto. Controlla il terminale selezionato prima di inviare.')
+          }
+        }
+        terminal.disabled = terminal.options.length === 0
+        updateSendState()
+      }
+
+      async function sendMessage() {
+        if (busy || !terminal.value || !draft.value.trim()) return
+        const text = draft.value
+        const terminalId = terminal.value
+        busy = true
+        terminal.disabled = true
+        showStatus('Invio in corso…')
+        updateSendState()
+        // A deliberate send replaces any unsent agent input, like Orca ChatUI.
+        const result = await call('terminal.sendText', {
+          terminalId,
+          text: '\x15' + text,
+          enter: true
+        })
+        busy = false
+        terminal.disabled = false
+        if (!result.ok) {
+          showStatus(result.error || result.errorCode || 'Invio non confermato. Verifica la chat.', true)
+        } else if (!result.value || result.value.accepted !== true) {
+          showStatus('Il terminale ha rifiutato il messaggio. Il testo è ancora qui.', true)
+        } else {
+          if (draft.value === text) draft.value = ''
+          showStatus('Accettato dal terminale. Attendi la risposta dell’agente.')
+        }
+        updateSendState()
+      }
+
+      refresh.addEventListener('click', loadTerminals)
+      terminal.addEventListener('change', updateSendState)
+      draft.addEventListener('input', updateSendState)
+      draft.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return
+        event.preventDefault()
+        sendMessage()
+      })
+      send.addEventListener('click', sendMessage)
+      loadTerminals()
+    </script>
+  </body>
+</html>
