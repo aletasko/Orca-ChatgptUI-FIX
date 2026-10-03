@@ -10,7 +10,7 @@ In Orca, apri **Settings → Plugins → Install → Git URL** e inserisci:
 
 `https://github.com/aletasko/Orca-ChatgptUI-FIX.git#main`
 
-Il repository è privato: Git sul computer che esegue il client Orca deve avere accesso al repository. Dopo l'installazione, esamina e abilita i permessi `workspace:read` e `terminal:send`. Apri il pannello **ChatUI Send FIX**, seleziona il terminale e invia il messaggio.
+Il repository è pubblico e non richiede credenziali Git. Dopo l'installazione, esamina e abilita i permessi `workspace:read` e `terminal:send`. Apri il pannello **ChatUI Send FIX**, seleziona il terminale e invia il messaggio.
 
 Per aggiornare: ripeti **Settings → Plugins → Install → Git URL** con lo stesso link dopo che `main` è stato aggiornato. Il link `#main` segue i nuovi commit; Orca non modifica automaticamente la versione installata a ogni push.
 
