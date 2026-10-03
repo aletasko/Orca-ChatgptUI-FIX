@@ -12,7 +12,7 @@ In Orca, apri **Settings → Plugins → Install → Git URL** e inserisci:
 
 Il repository è privato: Git sul computer che esegue il client Orca deve avere accesso al repository. Dopo l'installazione, esamina e abilita i permessi `workspace:read` e `terminal:send`. Apri il pannello **ChatUI Send FIX**, seleziona il terminale e invia il messaggio.
 
-Per aggiornare: aggiorna il plugin dalla schermata Plugins dopo che `main` è stato aggiornato. Il link `#main` segue i nuovi commit; Orca non modifica automaticamente la versione installata a ogni push.
+Per aggiornare: ripeti **Settings → Plugins → Install → Git URL** con lo stesso link dopo che `main` è stato aggiornato. Il link `#main` segue i nuovi commit; Orca non modifica automaticamente la versione installata a ogni push.
 
 ## Limiti
 
